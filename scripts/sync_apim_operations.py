@@ -49,7 +49,7 @@ def sync_apim_operations(subscription_id, resource_group, service_name, spec_fil
     
     # Create or update the API
     print(f"Syncing API: {api_id} with path {path} and method {method}")
-    poller = client.api.create_or_update(
+    poller = client.api.begin_create_or_update(
         resource_group,
         service_name,
         api_id,
