@@ -4,10 +4,9 @@
 import argparse
 import json
 import os
-from azure.mgmt.apimanagement 
-import ApiManagementClient
-from azure.identity 
-import DefaultAzureCredential
+from azure.mgmt.apimanagement import ApiManagementClient
+from azure.identity import DefaultAzureCredential
+
 
 def sync_apim_operations(subscription_id, resource_group, service_name, spec_file, api_id):
     """Sync API operations in APIM based on Swagger specification"""
