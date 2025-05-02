@@ -1,4 +1,3 @@
-# scripts/split_swagger_by_method.py
 import json
 import os
 import argparse
@@ -12,23 +11,31 @@ with open(args.swagger_file, "r") as f:
     swagger = json.load(f)
 
 paths = swagger.get("paths", {})
+
+if not paths:
+    print("⚠️ No paths found in the Swagger file!")
+    exit(1)
+
+print("Swagger paths found:")
+for p in paths:
+    print(f"  - {p}")
+
 os.makedirs(args.output_dir, exist_ok=True)
 
 for path, methods in paths.items():
+    normalized_path = path.strip('/')
     for method, operation in methods.items():
         method_lower = method.lower()
 
         # Custom filename mapping
-        if path == "/users" and method_lower == "get":
+        if normalized_path == "users" and method_lower == "get":
             file_name = "users_get.json"
-        elif path == "/users" and method_lower == "post":
+        elif normalized_path == "users" and method_lower == "post":
             file_name = "users_post.json"
         else:
-            # Fallback to operationId-based filename
-            operation_id = operation.get("operationId", f"{path.strip('/').replace('/', '_')}_{method_lower}")
+            operation_id = operation.get("operationId", f"{normalized_path.replace('/', '_')}_{method_lower}")
             file_name = f"{operation_id}.json"
 
-        # Create individual swagger with only the relevant method
         new_spec = {
             **swagger,
             "paths": {
@@ -42,4 +49,4 @@ for path, methods in paths.items():
         with open(out_path, "w") as out_file:
             json.dump(new_spec, out_file, indent=2)
 
-        print(f"Created: {file_name}")
+        print(f"✅ Created: {file_name}")
