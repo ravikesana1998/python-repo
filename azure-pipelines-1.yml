@@ -9,8 +9,6 @@ trigger:
 pool:
   name: 'agent-pool'
 
-
-
 variables:
   swaggerUrl: 'https://python-web-app-1-bgape3c8aqahgjcn.centralindia-01.azurewebsites.net/openapi.json'
   fullSwagger: 'swagger-full.json'
@@ -19,27 +17,20 @@ variables:
   apimName: 'python-swagger'
   subscriptionId: '361d2915-ae3c-4eda-a472-cd1a9f5a25a9'
   appBaseUrl: 'https://python-web-app-1-bgape3c8aqahgjcn.centralindia-01.azurewebsites.net'
-  
-  # API IDs should be defined as separate variables
   apiGet: 'get-user'
   apiPost: 'add-user'
 
 steps:
-- task: UsePythonVersion@0
-  displayName: 'Use Python 3.x'
-  inputs:
-    versionSpec: '3.x'
-
 - script: |
     curl -sSL $(swaggerUrl) -o $(fullSwagger)
   displayName: 'Download Full Swagger'
 
 - script: |
-    python split_swagger_by_method.py $(fullSwagger) --output-dir $(outputDir)
+    python3 split_swagger_by_method.py $(fullSwagger) --output-dir $(outputDir)
   displayName: 'Split Swagger by Method'
 
 - script: |
-    python sync_apim_operations.py \
+    python3 sync_apim_operations.py \
       --subscription-id $(subscriptionId) \
       --resource-group $(resourceGroup) \
       --service-name $(apimName) \
@@ -64,7 +55,7 @@ steps:
         --service-url "$(appBaseUrl)"
 
 - script: |
-    python sync_apim_operations.py \
+    python3 sync_apim_operations.py \
       --subscription-id $(subscriptionId) \
       --resource-group $(resourceGroup) \
       --service-name $(apimName) \
