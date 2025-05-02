@@ -5,6 +5,7 @@ trigger:
   paths:
     include:
       - 'pipeline-folder/*'
+      - 'scripts/*'
 
 pool:
   name: 'agent-pool'
