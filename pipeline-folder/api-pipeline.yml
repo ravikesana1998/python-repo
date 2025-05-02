@@ -50,7 +50,7 @@ steps:
 - task: AzureCLI@2
   displayName: 'Import GET API'
   inputs:
-    azureSubscription: 'Azure Resource-service connectiom'
+    azureSubscription: 'Azure Resource-service connection'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
@@ -75,7 +75,7 @@ steps:
 - task: AzureCLI@2
   displayName: 'Import POST API'
   inputs:
-    azureSubscription: 'Azure Resource-service connectiom'
+    azureSubscription: 'Azure Resource-service connection'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
