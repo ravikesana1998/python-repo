@@ -31,6 +31,12 @@ steps:
   displayName: '1. Download Full Swagger'
 
 - script: |
+    echo "Checking file existence at: $(System.DefaultWorkingDirectory)/$(outputDir)/users_get.json"
+    ls -l $(System.DefaultWorkingDirectory)/$(outputDir)/users_get.json || echo "File not found!"
+    exit 1
+  displayName: 'Verify File Exists'
+
+- script: |
     echo "Running split script..."
     python3 scripts/split_swagger_by_method.py $(fullSwagger) --output-dir $(outputDir)
     echo "Split operation completed"
