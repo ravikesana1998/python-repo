@@ -1,8 +1,26 @@
-#swagger_by_method.py
-
 import json
 import os
 import argparse
+
+def sanitize_spec(swagger_part):
+    """Remove known invalid schemas and unused references."""
+    components = swagger_part.get("components", {})
+    schemas = components.get("schemas", {})
+
+    # Remove known invalid schemas
+    invalid_schemas = ["HTTPValidationError", "ValidationError"]
+    for key in invalid_schemas:
+        if key in schemas:
+            print(f"Removing invalid schema: {key}")
+            del schemas[key]
+
+    # Clean up empty components
+    if not schemas:
+        components.pop("schemas", None)
+    if not components:
+        swagger_part.pop("components", None)
+
+    return swagger_part
 
 def split_swagger(input_file, output_dir):
     with open(input_file, 'r') as f:
@@ -24,18 +42,22 @@ def split_swagger(input_file, output_dir):
             output_spec = {
                 'openapi': swagger.get('openapi', '3.0.0'),
                 'info': swagger.get('info', {}),
-                'paths': output_files[method]['paths']
+                'paths': output_files[method]['paths'],
+                'components': swagger.get('components', {})  # optionally include base schemas
             }
-            
+
+            # Sanitize the spec
+            output_spec = sanitize_spec(output_spec)
+
             output_path = os.path.join(output_dir, f'swagger-{method}.json')
             with open(output_path, 'w') as f:
                 json.dump(output_spec, f, indent=2)
-            print(f"Created {output_path}")
+            print(f"Created sanitized spec: {output_path}")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("swagger_file", help="Path to Swagger JSON file")
     parser.add_argument("--output-dir", default="split_swagger", help="Output directory")
     args = parser.parse_args()
-    
+
     split_swagger(args.swagger_file, args.output_dir)
