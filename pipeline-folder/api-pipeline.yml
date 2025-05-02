@@ -7,9 +7,9 @@ trigger:
       - 'pipeline-folder/*'
 
 pool:
-  name: 'agent-pool'  # Matches your shown pool name
+  name: 'agent-pool'  # Matches your existing pool
   demands:
-    - agent.name -equals van-1  # Specific agent demand (optional)
+    - agent.name -equals vm-1  # Specific agent from your screenshot
 
 
 variables:
