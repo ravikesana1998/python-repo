@@ -49,12 +49,18 @@ def sync_apim_operations(subscription_id, resource_group, service_name, spec_fil
     
     # Create or update the API
     print(f"Syncing API: {api_id} with path {path} and method {method}")
-    poller = client.api.begin_create_or_update(
-        resource_group,
-        service_name,
-        api_id,
-        api_params
-    )
+   poller = client.api.begin_create_or_update(
+    resource_group_name=resource_group_name,
+    service_name=service_name,
+    api_id=api_id,
+    parameters={
+        "display_name": "Users API",
+        "service_url": "https://python-web-app-1-bgape3c8aqahgjcn.centralindia-01.azurewebsites.net",
+        "path": "users",
+        "protocols": ["https"],
+    },
+)
+
     
     result = poller.result()
     print(f"Successfully synced API: {result.display_name}")
