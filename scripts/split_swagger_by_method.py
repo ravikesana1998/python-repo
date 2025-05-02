@@ -1,3 +1,5 @@
+#split_swagger_by_method.py
+
 import json
 import os
 import argparse
