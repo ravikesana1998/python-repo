@@ -3,15 +3,17 @@
 
 import argparse
 import json
+import os
 from azure.mgmt.apimanagement import ApiManagementClient
 from azure.identity import DefaultAzureCredential
 
 def sync_apim_operations(subscription_id, resource_group, service_name, spec_file, api_id):
     """Sync API operations in APIM based on Swagger specification"""
-
-     if not os.path.exists(spec_file):
+    
+    # Verify spec file exists (FIXED INDENTATION)
+    if not os.path.exists(spec_file):
         raise FileNotFoundError(f"Spec file not found at: {spec_file}. Current working dir: {os.getcwd()}")
-
+    
     # Initialize Azure client
     credential = DefaultAzureCredential()
     client = ApiManagementClient(credential, subscription_id)
