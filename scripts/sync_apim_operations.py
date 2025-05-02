@@ -1,55 +1,78 @@
-"# sync_apim_operations.py" hi
+#!/usr/bin/env python3
+# sync_apim_operations.py - Synchronizes API operations in Azure API Management
 
+import argparse
+import json
+from azure.mgmt.apimanagement import ApiManagementClient
+from azure.identity import DefaultAzureCredential
 
-- script: |
-    curl -sSL $(swaggerUrl) -o $(fullSwagger)
-  displayName: 'Download Full Swagger'
+def sync_apim_operations(subscription_id, resource_group, service_name, spec_file, api_id):
+    """Sync API operations in APIM based on Swagger specification"""
+    
+    # Initialize Azure client
+    credential = DefaultAzureCredential()
+    client = ApiManagementClient(credential, subscription_id)
+    
+    # Load the Swagger specification
+    with open(spec_file, 'r') as f:
+        api_spec = json.load(f)
+    
+    # Get the API entity to check if it exists
+    try:
+        api = client.api.get(resource_group, service_name, api_id)
+        print(f"Found existing API: {api.display_name}")
+    except:
+        print("API not found, will create new API")
+        api = None
+    
+    # Extract the first path and method (since we split by method)
+    path = next(iter(api_spec.get('paths', {})))
+    method = next(iter(api_spec['paths'][path]))
+    operation = api_spec['paths'][path][method]
+    
+    # Prepare API parameters
+    api_params = {
+        'display_name': operation.get('summary', api_id),
+        'description': operation.get('description', ''),
+        'path': path,
+        'protocols': ['https'],
+        'service_url': api_spec.get('host', ''),
+        'format': 'openapi+json-link',
+        'value': json.dumps(api_spec),
+        'api_type': 'http'
+    }
+    
+    # Create or update the API
+    print(f"Syncing API: {api_id} with path {path} and method {method}")
+    poller = client.api.create_or_update(
+        resource_group,
+        service_name,
+        api_id,
+        api_params
+    )
+    
+    result = poller.result()
+    print(f"Successfully synced API: {result.display_name}")
 
-- script: |
-    python3 scripts/split_swagger_by_method.py $(fullSwagger) --output-dir $(outputDir)
-  displayName: 'Split Swagger by Method'
+def main():
+    parser = argparse.ArgumentParser(
+        description='Sync API operations in Azure API Management'
+    )
+    parser.add_argument('--subscription-id', required=True, help='Azure subscription ID')
+    parser.add_argument('--resource-group', required=True, help='Resource group name')
+    parser.add_argument('--service-name', required=True, help='APIM service name')
+    parser.add_argument('--spec-file', required=True, help='Path to OpenAPI/Swagger JSON file')
+    parser.add_argument('--api-id', required=True, help='API identifier in APIM')
+    
+    args = parser.parse_args()
+    
+    sync_apim_operations(
+        args.subscription_id,
+        args.resource_group,
+        args.service_name,
+        args.spec_file,
+        args.api_id
+    )
 
-# ✅ Debug: List split_swagger folder contents
-- script: |
-    echo "Checking output folder contents:"
-    ls -R $(outputDir)
-  displayName: 'Debug: List split_swagger output'
-
-# ✅ Debug: Show content of users_get.json
-- script: |
-    echo "Content of users_get.json:"
-    cat $(outputDir)/users_get.json || echo "File not found!"
-  displayName: 'Debug: Show users_get.json content'
-
-- script: |
-    python3 scripts/sync_apim_operations.py \
-      --subscription-id $(subscriptionId) \
-      --resource-group $(resourceGroup) \
-      --service-name $(apimName) \
-      --spec-file $(outputDir)/users_get.json \
-      --api-id $(apiGet)
-  displayName: 'Sync GET operations in APIM'
-
-- task: AzureCLI@2
-  displayName: 'Import GET API'
-  inputs:
-    azureSubscription: 'Azure Resource Connection'
-    scriptType: 'bash'
-    scriptLocation: 'inlineScript'
-    inlineScript: |
-      ls -l $(outputDir)
-      if [ -f "$(outputDir)/users_get.json" ]; then
-        echo "users_get.json found, proceeding with import..."
-      else
-        echo "ERROR: users_get.json not found!"
-        exit 1
-      fi
-
-      az apim api import \
-        --resource-group $(resourceGroup) \
-        --service-name $(apimName) \
-        --path users/get_user \
-        --api-id $(apiGet) \
-        --specification-format OpenApi \
-        --specification-path $(outputDir)/users_get.json \
-        --service-url "$(appBaseUrl)"
+if __name__ == '__main__':
+    main()
