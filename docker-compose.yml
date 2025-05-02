@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  fastapi-app:
+    build: .
+    container_name: users_project
+    ports:
+      - "8000:8000"
+    restart: always
+    environment:
+      - MONGO_URI=${MONGO_URI}
+      - DATABASE_NAME=${DATABASE_NAME}
