@@ -7,7 +7,10 @@ trigger:
       - 'pipeline-folder/*'
 
 pool:
- name: 'agent-pool'
+  name: 'agent-pool'  # Matches your shown pool name
+  demands:
+    - agent.name -equals van-1  # Specific agent demand (optional)
+
 
 variables:
   swaggerUrl: 'https://python-web-app-1-bgape3c8aqahgjcn.centralindia-01.azurewebsites.net/openapi.json'
