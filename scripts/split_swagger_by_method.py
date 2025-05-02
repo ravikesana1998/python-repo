@@ -1,5 +1,3 @@
-#split_swagger_by_method.py
-
 import json
 import os
 import argparse
@@ -18,16 +16,25 @@ if not paths:
     print("⚠️ No paths found in the Swagger file!")
     exit(1)
 
-print("Swagger paths found:")
-for p in paths:
-    print(f"  - {p}")
+# DEBUG: Print all paths and methods
+print("=== DEBUG: All Paths and Methods ===")
+for path, methods in paths.items():
+    print(f"Path: {path}")
+    for method in methods:
+        print(f"  - Method: {method}")
+print("===================================")
 
 os.makedirs(args.output_dir, exist_ok=True)
+
+files_created = 0
 
 for path, methods in paths.items():
     normalized_path = path.strip('/')
     for method, operation in methods.items():
         method_lower = method.lower()
+
+        # DEBUG: Print current processing
+        print(f"Processing: {normalized_path} ({method_lower})")
 
         # Custom filename mapping
         if normalized_path == "users" and method_lower == "get":
@@ -42,7 +49,7 @@ for path, methods in paths.items():
             **swagger,
             "paths": {
                 path: {
-                    method_lower: methods[method]
+                    method: methods[method]  # Keep original method case
                 }
             }
         }
@@ -52,3 +59,8 @@ for path, methods in paths.items():
             json.dump(new_spec, out_file, indent=2)
 
         print(f"✅ Created: {file_name}")
+        files_created += 1
+
+if files_created == 0:
+    print("⚠️ No files were created! Check if your paths match expected patterns.")
+    exit(1)
