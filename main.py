@@ -3,6 +3,9 @@ from fastapi import FastAPI
 from app.routers import users
 import uvicorn
 
+from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
+
 app = FastAPI()
 
 app.add_middleware(
@@ -16,8 +19,23 @@ app.add_middleware(
 app.include_router(users.router, prefix="/users", tags=["Users"])
 
 @app.get("/")
-async def root():
-    return {"message": "Welcome to FastAPI with MongoDB!"}
+def read_root():
+    return {"Hello": "World"}
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title="Your API",
+        version="1.0.0",
+        description="Custom API",
+        routes=app.routes,
+    )
+    openapi_schema["components"]["schemas"].pop("HTTPValidationError", None)
+    openapi_schema["components"]["schemas"].pop("ValidationError", None)
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 
 if __name__ == "__main__":
