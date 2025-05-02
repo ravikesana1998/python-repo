@@ -26,7 +26,13 @@ steps:
 - task: UsePythonVersion@0
   displayName: 'Set up Python'
   inputs:
-    versionSpec: '3.x'
+    versionSpec: '3.10'
+
+- script: |
+    echo "Upgrading pip..."
+    python3 -m ensurepip --upgrade
+    python3 -m pip install --upgrade pip
+  displayName: 'Upgrade Pip'
 
 - script: |
     echo "Downloading Swagger from $(swaggerUrl)"
@@ -85,7 +91,7 @@ steps:
         --specification-path $(outputDir)/swagger-get.json \
         --service-url "$(appBaseUrl)"
 
-# Repeat similar structure for POST, PATCH, DELETE
+# POST Operations
 - script: |
     if [ ! -f "$(outputDir)/swagger-post.json" ]; then
       echo "Error: POST Swagger file not found at $(outputDir)/swagger-post.json"
