@@ -18,72 +18,101 @@ variables:
   apimName: 'python-swagger'
   subscriptionId: '361d2915-ae3c-4eda-a472-cd1a9f5a25a9'
   appBaseUrl: 'https://python-web-app-1-bgape3c8aqahgjcn.centralindia-01.azurewebsites.net'
- variables:
   apiGet: 'get-user'
   apiPost: 'add-user'
 
 steps:
 - script: |
+    echo "Current working directory: $(pwd)"
+    echo "Downloading swagger from $(swaggerUrl)"
     curl -sSL $(swaggerUrl) -o $(fullSwagger)
-  displayName: 'Download Full Swagger'
+    echo "Downloaded swagger file:"
+    ls -l $(fullSwagger)
+  displayName: '1. Download Full Swagger'
 
 - script: |
+    echo "Running split script..."
     python3 scripts/split_swagger_by_method.py $(fullSwagger) --output-dir $(outputDir)
-  displayName: 'Split Swagger by Method'
+    echo "Split operation completed"
+  displayName: '2. Split Swagger by Method'
 
 - script: |
-    echo "Generated files:"
-    ls -l $(outputDir)
-  displayName: 'List Split Swagger Files'
-
+    echo "=== DEBUG: Checking output directory ==="
+    echo "Current directory: $(pwd)"
+    echo "Output directory contents:"
+    ls -R $(outputDir)
+    echo "=== Users GET file details ==="
+    ls -l $(outputDir)/users_get.json || echo "users_get.json not found!"
+    echo "=== Users POST file details ==="
+    ls -l $(outputDir)/users_post.json || echo "users_post.json not found!"
+  displayName: '3. Verify Split Output'
 
 - script: |
-    python3 scripts/sync_apim_operations.py \
-      --subscription-id $(subscriptionId) \
-      --resource-group $(resourceGroup) \
-      --service-name $(apimName) \
-      --spec-file $(outputDir)/users_get.json \
-      --api-id $(apiGet)
-  displayName: 'Sync GET operations in APIM'
-
+    echo "=== DEBUG: Before sync_apim_operations ==="
+    echo "Checking if users_get.json exists at path: $(System.DefaultWorkingDirectory)/$(outputDir)/users_get.json"
+    if [ -f "$(System.DefaultWorkingDirectory)/$(outputDir)/users_get.json" ]; then
+      echo "File exists, proceeding..."
+      python3 scripts/sync_apim_operations.py \
+        --subscription-id $(subscriptionId) \
+        --resource-group $(resourceGroup) \
+        --service-name $(apimName) \
+        --spec-file $(System.DefaultWorkingDirectory)/$(outputDir)/users_get.json \
+        --api-id $(apiGet)
+    else
+      echo "ERROR: File not found!"
+      exit 1
+    fi
+  displayName: '4. Sync GET operations in APIM'
 
 - task: AzureCLI@2
-  displayName: 'Import GET API'
+  displayName: '5. Import GET API'
   inputs:
     azureSubscription: 'Azure Resource-service connection'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
+      echo "Importing GET API..."
+      ls -l $(System.DefaultWorkingDirectory)/$(outputDir)
       az apim api import \
         --resource-group $(resourceGroup) \
         --service-name $(apimName) \
         --path users/get_user \
         --api-id $(apiGet) \
         --specification-format OpenApi \
-        --specification-path $(outputDir)/users_get.json \
+        --specification-path $(System.DefaultWorkingDirectory)/$(outputDir)/users_get.json \
         --service-url "$(appBaseUrl)"
+      echo "GET API import completed"
 
 - script: |
-    python3 scripts/sync_apim_operations.py \
-      --subscription-id $(subscriptionId) \
-      --resource-group $(resourceGroup) \
-      --service-name $(apimName) \
-      --spec-file $(outputDir)/users_post.json \
-      --api-id $(apiPost)
-  displayName: 'Sync POST operations in APIM'
+    echo "=== DEBUG: Before POST sync ==="
+    if [ -f "$(System.DefaultWorkingDirectory)/$(outputDir)/users_post.json" ]; then
+      echo "File exists, proceeding..."
+      python3 scripts/sync_apim_operations.py \
+        --subscription-id $(subscriptionId) \
+        --resource-group $(resourceGroup) \
+        --service-name $(apimName) \
+        --spec-file $(System.DefaultWorkingDirectory)/$(outputDir)/users_post.json \
+        --api-id $(apiPost)
+    else
+      echo "ERROR: users_post.json not found!"
+      exit 1
+    fi
+  displayName: '6. Sync POST operations in APIM'
 
 - task: AzureCLI@2
-  displayName: 'Import POST API'
+  displayName: '7. Import POST API'
   inputs:
     azureSubscription: 'Azure Resource-service connection'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
+      echo "Importing POST API..."
       az apim api import \
         --resource-group $(resourceGroup) \
         --service-name $(apimName) \
         --path users/add_user \
         --api-id $(apiPost) \
         --specification-format OpenApi \
-        --specification-path $(outputDir)/users_post.json \
+        --specification-path $(System.DefaultWorkingDirectory)/$(outputDir)/users_post.json \
         --service-url "$(appBaseUrl)"
+      echo "POST API import completed"
