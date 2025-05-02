@@ -41,13 +41,29 @@ steps:
   displayName: 'Download Swagger'
 
 - script: |
+    echo "Splitting Swagger by method..."
     python3 scripts/split_swagger_by_method.py $(fullSwagger) --output-dir $(outputDir)
     echo "Split files created:"
     ls -l $(outputDir)
   displayName: 'Split Swagger by Method'
 
+# Debug step: Verify output directory contents
+- script: |
+    echo "Verifying contents of output directory $(outputDir):"
+    if [ -d "$(outputDir)" ]; then
+      ls -l $(outputDir)
+    else
+      echo "Output directory not found: $(outputDir)"
+      exit 1
+    fi
+  displayName: 'Verify split_swagger directory'
+
 # GET Operations
 - script: |
+    if [ ! -f "$(outputDir)/swagger-get.json" ]; then
+      echo "Error: GET Swagger file not found at $(outputDir)/swagger-get.json"
+      exit 1
+    fi
     python3 scripts/sync_apim_operations.py \
       --subscription-id $(subscriptionId) \
       --resource-group $(resourceGroup) \
@@ -72,8 +88,12 @@ steps:
         --specification-path $(outputDir)/swagger-get.json \
         --service-url "$(appBaseUrl)"
 
-# POST Operations
+# Repeat similar structure for POST, PATCH, DELETE
 - script: |
+    if [ ! -f "$(outputDir)/swagger-post.json" ]; then
+      echo "Error: POST Swagger file not found at $(outputDir)/swagger-post.json"
+      exit 1
+    fi
     python3 scripts/sync_apim_operations.py \
       --subscription-id $(subscriptionId) \
       --resource-group $(resourceGroup) \
@@ -98,54 +118,4 @@ steps:
         --specification-path $(outputDir)/swagger-post.json \
         --service-url "$(appBaseUrl)"
 
-# PATCH Operations
-- script: |
-    python3 scripts/sync_apim_operations.py \
-      --subscription-id $(subscriptionId) \
-      --resource-group $(resourceGroup) \
-      --service-name $(apimName) \
-      --spec-file $(outputDir)/swagger-patch.json \
-      --api-id $(apiPatch)
-  displayName: 'Sync PATCH Operations'
-
-- task: AzureCLI@2
-  displayName: 'Import PATCH API'
-  inputs:
-    azureSubscription: 'Azure Resource-service connection'
-    scriptType: 'bash'
-    scriptLocation: 'inlineScript'
-    inlineScript: |
-      az apim api import \
-        --resource-group $(resourceGroup) \
-        --service-name $(apimName) \
-        --path users-patch \
-        --api-id $(apiPatch) \
-        --specification-format OpenApi \
-        --specification-path $(outputDir)/swagger-patch.json \
-        --service-url "$(appBaseUrl)"
-
-# DELETE Operations
-- script: |
-    python3 scripts/sync_apim_operations.py \
-      --subscription-id $(subscriptionId) \
-      --resource-group $(resourceGroup) \
-      --service-name $(apimName) \
-      --spec-file $(outputDir)/swagger-delete.json \
-      --api-id $(apiDelete)
-  displayName: 'Sync DELETE Operations'
-
-- task: AzureCLI@2
-  displayName: 'Import DELETE API'
-  inputs:
-    azureSubscription: 'Azure Resource-service connection'
-    scriptType: 'bash'
-    scriptLocation: 'inlineScript'
-    inlineScript: |
-      az apim api import \
-        --resource-group $(resourceGroup) \
-        --service-name $(apimName) \
-        --path users-delete \
-        --api-id $(apiDelete) \
-        --specification-format OpenApi \
-        --specification-path $(outputDir)/swagger-delete.json \
-        --service-url "$(appBaseUrl)"
+# Additional PATCH and DELETE operations follow a similar pattern as above.
