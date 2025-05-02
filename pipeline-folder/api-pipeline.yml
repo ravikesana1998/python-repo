@@ -18,107 +18,134 @@ variables:
   apimName: 'python-swagger'
   subscriptionId: '361d2915-ae3c-4eda-a472-cd1a9f5a25a9'
   appBaseUrl: 'https://python-web-app-1-bgape3c8aqahgjcn.centralindia-01.azurewebsites.net'
-  apiGet: 'get-user'
-  apiPost: 'add-user'
+  
+  # API IDs for each method
+  apiGet: 'users-get'
+  apiPost: 'users-post'
+  apiPatch: 'users-patch'
+  apiDelete: 'users-delete'
 
 steps:
+- task: UsePythonVersion@0
+  displayName: 'Set up Python'
+  inputs:
+    versionSpec: '3.x'
+
 - script: |
-    echo "Current working directory: $(pwd)"
-    echo "Downloading swagger from $(swaggerUrl)"
+    echo "Downloading Swagger from $(swaggerUrl)"
     curl -sSL $(swaggerUrl) -o $(fullSwagger)
-    echo "Downloaded swagger file:"
+    echo "Downloaded Swagger file:"
     ls -l $(fullSwagger)
-  displayName: '1. Download Full Swagger'
+    echo "File content sample:"
+    head -n 20 $(fullSwagger)
+  displayName: 'Download Swagger'
 
 - script: |
-    echo "Checking file existence at: $(System.DefaultWorkingDirectory)/$(outputDir)/users_get.json"
-    ls -l $(System.DefaultWorkingDirectory)/$(outputDir)/users_get.json || echo "File not found!"
-    exit 1
-  displayName: 'Verify File Exists'
-
-- script: |
-    echo "Running split script..."
     python3 scripts/split_swagger_by_method.py $(fullSwagger) --output-dir $(outputDir)
-    echo "Split operation completed"
-  displayName: '2. Split Swagger by Method'
+    echo "Split files created:"
+    ls -l $(outputDir)
+  displayName: 'Split Swagger by Method'
 
+# GET Operations
 - script: |
-    echo "=== DEBUG: Checking output directory ==="
-    echo "Current directory: $(pwd)"
-    echo "Output directory contents:"
-    ls -R $(outputDir)
-    echo "=== Users GET file details ==="
-    ls -l $(outputDir)/users_get.json || echo "users_get.json not found!"
-    echo "=== Users POST file details ==="
-    ls -l $(outputDir)/users_post.json || echo "users_post.json not found!"
-  displayName: '3. Verify Split Output'
-
-- script: |
-    echo "=== DEBUG: Before sync_apim_operations ==="
-    echo "Checking if users_get.json exists at path: $(System.DefaultWorkingDirectory)/$(outputDir)/users_get.json"
-    if [ -f "$(System.DefaultWorkingDirectory)/$(outputDir)/users_get.json" ]; then
-      echo "File exists, proceeding..."
-      python3 scripts/sync_apim_operations.py \
-        --subscription-id $(subscriptionId) \
-        --resource-group $(resourceGroup) \
-        --service-name $(apimName) \
-        --spec-file $(System.DefaultWorkingDirectory)/$(outputDir)/users_get.json \
-        --api-id $(apiGet)
-    else
-      echo "ERROR: File not found!"
-      exit 1
-    fi
-  displayName: '4. Sync GET operations in APIM'
+    python3 scripts/sync_apim_operations.py \
+      --subscription-id $(subscriptionId) \
+      --resource-group $(resourceGroup) \
+      --service-name $(apimName) \
+      --spec-file $(outputDir)/swagger-get.json \
+      --api-id $(apiGet)
+  displayName: 'Sync GET Operations'
 
 - task: AzureCLI@2
-  displayName: '5. Import GET API'
+  displayName: 'Import GET API'
   inputs:
     azureSubscription: 'Azure Resource-service connection'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
-      echo "Importing GET API..."
-      ls -l $(System.DefaultWorkingDirectory)/$(outputDir)
       az apim api import \
         --resource-group $(resourceGroup) \
         --service-name $(apimName) \
-        --path users/get_user \
+        --path users-get \
         --api-id $(apiGet) \
         --specification-format OpenApi \
-        --specification-path $(System.DefaultWorkingDirectory)/$(outputDir)/users_get.json \
+        --specification-path $(outputDir)/swagger-get.json \
         --service-url "$(appBaseUrl)"
-      echo "GET API import completed"
 
+# POST Operations
 - script: |
-    echo "=== DEBUG: Before POST sync ==="
-    if [ -f "$(System.DefaultWorkingDirectory)/$(outputDir)/users_post.json" ]; then
-      echo "File exists, proceeding..."
-      python3 scripts/sync_apim_operations.py \
-        --subscription-id $(subscriptionId) \
-        --resource-group $(resourceGroup) \
-        --service-name $(apimName) \
-        --spec-file $(System.DefaultWorkingDirectory)/$(outputDir)/users_post.json \
-        --api-id $(apiPost)
-    else
-      echo "ERROR: users_post.json not found!"
-      exit 1
-    fi
-  displayName: '6. Sync POST operations in APIM'
+    python3 scripts/sync_apim_operations.py \
+      --subscription-id $(subscriptionId) \
+      --resource-group $(resourceGroup) \
+      --service-name $(apimName) \
+      --spec-file $(outputDir)/swagger-post.json \
+      --api-id $(apiPost)
+  displayName: 'Sync POST Operations'
 
 - task: AzureCLI@2
-  displayName: '7. Import POST API'
+  displayName: 'Import POST API'
   inputs:
     azureSubscription: 'Azure Resource-service connection'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
-      echo "Importing POST API..."
       az apim api import \
         --resource-group $(resourceGroup) \
         --service-name $(apimName) \
-        --path users/add_user \
+        --path users-post \
         --api-id $(apiPost) \
         --specification-format OpenApi \
-        --specification-path $(System.DefaultWorkingDirectory)/$(outputDir)/users_post.json \
+        --specification-path $(outputDir)/swagger-post.json \
         --service-url "$(appBaseUrl)"
-      echo "POST API import completed"
+
+# PATCH Operations
+- script: |
+    python3 scripts/sync_apim_operations.py \
+      --subscription-id $(subscriptionId) \
+      --resource-group $(resourceGroup) \
+      --service-name $(apimName) \
+      --spec-file $(outputDir)/swagger-patch.json \
+      --api-id $(apiPatch)
+  displayName: 'Sync PATCH Operations'
+
+- task: AzureCLI@2
+  displayName: 'Import PATCH API'
+  inputs:
+    azureSubscription: 'Azure Resource-service connection'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      az apim api import \
+        --resource-group $(resourceGroup) \
+        --service-name $(apimName) \
+        --path users-patch \
+        --api-id $(apiPatch) \
+        --specification-format OpenApi \
+        --specification-path $(outputDir)/swagger-patch.json \
+        --service-url "$(appBaseUrl)"
+
+# DELETE Operations
+- script: |
+    python3 scripts/sync_apim_operations.py \
+      --subscription-id $(subscriptionId) \
+      --resource-group $(resourceGroup) \
+      --service-name $(apimName) \
+      --spec-file $(outputDir)/swagger-delete.json \
+      --api-id $(apiDelete)
+  displayName: 'Sync DELETE Operations'
+
+- task: AzureCLI@2
+  displayName: 'Import DELETE API'
+  inputs:
+    azureSubscription: 'Azure Resource-service connection'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      az apim api import \
+        --resource-group $(resourceGroup) \
+        --service-name $(apimName) \
+        --path users-delete \
+        --api-id $(apiDelete) \
+        --specification-format OpenApi \
+        --specification-path $(outputDir)/swagger-delete.json \
+        --service-url "$(appBaseUrl)"
