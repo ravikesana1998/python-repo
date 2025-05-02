@@ -1,4 +1,7 @@
 trigger:
+  branches:
+    include:
+      - main
   paths:
     include:
       - 'pipeline-folder/*'
@@ -32,7 +35,9 @@ steps:
     echo "Upgrading pip..."
     python3 -m ensurepip --upgrade
     python3 -m pip install --upgrade pip
-  displayName: 'Upgrade Pip'
+    echo "Installing required Python dependencies..."
+    python3 -m pip install azure-identity cryptography
+  displayName: 'Upgrade Pip and Install Dependencies'
 
 - script: |
     echo "Downloading Swagger from $(swaggerUrl)"
@@ -50,7 +55,6 @@ steps:
     ls -l $(outputDir)
   displayName: 'Split Swagger by Method'
 
-# Debug step: Verify output directory contents
 - script: |
     echo "Verifying contents of output directory $(outputDir):"
     if [ -d "$(outputDir)" ]; then
@@ -90,35 +94,3 @@ steps:
         --specification-format OpenApi \
         --specification-path $(outputDir)/swagger-get.json \
         --service-url "$(appBaseUrl)"
-
-# POST Operations
-- script: |
-    if [ ! -f "$(outputDir)/swagger-post.json" ]; then
-      echo "Error: POST Swagger file not found at $(outputDir)/swagger-post.json"
-      exit 1
-    fi
-    python3 scripts/sync_apim_operations.py \
-      --subscription-id $(subscriptionId) \
-      --resource-group $(resourceGroup) \
-      --service-name $(apimName) \
-      --spec-file $(outputDir)/swagger-post.json \
-      --api-id $(apiPost)
-  displayName: 'Sync POST Operations'
-
-- task: AzureCLI@2
-  displayName: 'Import POST API'
-  inputs:
-    azureSubscription: 'Azure Resource-service connectiom'
-    scriptType: 'bash'
-    scriptLocation: 'inlineScript'
-    inlineScript: |
-      az apim api import \
-        --resource-group $(resourceGroup) \
-        --service-name $(apimName) \
-        --path users-post \
-        --api-id $(apiPost) \
-        --specification-format OpenApi \
-        --specification-path $(outputDir)/swagger-post.json \
-        --service-url "$(appBaseUrl)"
-
-# Additional PATCH and DELETE operations follow a similar pattern as above.
