@@ -18,28 +18,59 @@ variables:
   apimName: 'python-swagger'
   subscriptionId: '361d2915-ae3c-4eda-a472-cd1a9f5a25a9'
   appBaseUrl: 'https://python-web-app-1-bgape3c8aqahgjcn.centralindia-01.azurewebsites.net'
-  apiGet: 'get-user'
-  apiPost: 'add-user'
+  
+  # API IDs for each method
+  apiGet: 'users-get'
+  apiPost: 'users-post'
+  apiPatch: 'users-patch'
+  apiDelete: 'users-delete'
 
 steps:
-- script: |
-    curl -sSL $(swaggerUrl) -o $(fullSwagger)
-  displayName: 'Download Full Swagger'
+- task: UsePythonVersion@0
+  displayName: 'Set up Python'
+  inputs:
+    versionSpec: '3.x'
 
 - script: |
+    echo "Downloading Swagger from $(swaggerUrl)"
+    curl -sSL $(swaggerUrl) -o $(fullSwagger)
+    echo "Downloaded Swagger file:"
+    ls -l $(fullSwagger)
+    echo "File content sample:"
+    head -n 20 $(fullSwagger)
+  displayName: 'Download Swagger'
+
+- script: |
+    echo "Splitting Swagger by method..."
     python3 scripts/split_swagger_by_method.py $(fullSwagger) --output-dir $(outputDir)
+    echo "Split files created:"
+    ls -l $(outputDir)
   displayName: 'Split Swagger by Method'
 
-
+# Debug step: Verify output directory contents
 - script: |
+    echo "Verifying contents of output directory $(outputDir):"
+    if [ -d "$(outputDir)" ]; then
+      ls -l $(outputDir)
+    else
+      echo "Output directory not found: $(outputDir)"
+      exit 1
+    fi
+  displayName: 'Verify split_swagger directory'
+
+# GET Operations
+- script: |
+    if [ ! -f "$(outputDir)/swagger-get.json" ]; then
+      echo "Error: GET Swagger file not found at $(outputDir)/swagger-get.json"
+      exit 1
+    fi
     python3 scripts/sync_apim_operations.py \
       --subscription-id $(subscriptionId) \
       --resource-group $(resourceGroup) \
       --service-name $(apimName) \
-      --spec-file $(outputDir)/users_get.json \
+      --spec-file $(outputDir)/swagger-get.json \
       --api-id $(apiGet)
-  displayName: 'Sync GET operations in APIM'
-
+  displayName: 'Sync GET Operations'
 
 - task: AzureCLI@2
   displayName: 'Import GET API'
@@ -51,20 +82,25 @@ steps:
       az apim api import \
         --resource-group $(resourceGroup) \
         --service-name $(apimName) \
-        --path users/get_user \
+        --path users-get \
         --api-id $(apiGet) \
         --specification-format OpenApi \
-        --specification-path $(outputDir)/users_get.json \
+        --specification-path $(outputDir)/swagger-get.json \
         --service-url "$(appBaseUrl)"
 
+# Repeat similar structure for POST, PATCH, DELETE
 - script: |
+    if [ ! -f "$(outputDir)/swagger-post.json" ]; then
+      echo "Error: POST Swagger file not found at $(outputDir)/swagger-post.json"
+      exit 1
+    fi
     python3 scripts/sync_apim_operations.py \
       --subscription-id $(subscriptionId) \
       --resource-group $(resourceGroup) \
       --service-name $(apimName) \
-      --spec-file $(outputDir)/users_post.json \
+      --spec-file $(outputDir)/swagger-post.json \
       --api-id $(apiPost)
-  displayName: 'Sync POST operations in APIM'
+  displayName: 'Sync POST Operations'
 
 - task: AzureCLI@2
   displayName: 'Import POST API'
@@ -76,8 +112,10 @@ steps:
       az apim api import \
         --resource-group $(resourceGroup) \
         --service-name $(apimName) \
-        --path users/add_user \
+        --path users-post \
         --api-id $(apiPost) \
         --specification-format OpenApi \
-        --specification-path $(outputDir)/users_post.json \
+        --specification-path $(outputDir)/swagger-post.json \
         --service-url "$(appBaseUrl)"
+
+# Additional PATCH and DELETE operations follow a similar pattern as above.
