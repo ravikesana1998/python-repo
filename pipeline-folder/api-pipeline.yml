@@ -18,6 +18,7 @@ variables:
   apimName: 'python-swagger'
   subscriptionId: '361d2915-ae3c-4eda-a472-cd1a9f5a25a9'
   appBaseUrl: 'https://python-web-app-1-bgape3c8aqahgjcn.centralindia-01.azurewebsites.net'
+ variables:
   apiGet: 'get-user'
   apiPost: 'add-user'
 
