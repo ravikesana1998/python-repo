@@ -12,7 +12,7 @@ class APIMSync:
         self.credential = DefaultAzureCredential()
         self.client = ApiManagementClient(
             credential=self.credential,
-            subscription_id=subscript_id
+            subscription_id=361d2915-ae3c-4eda-a472-cd1a9f5a25a9
         )
         self.resource_group = resource_group
         self.service_name = service_name
