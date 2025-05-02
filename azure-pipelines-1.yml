@@ -1,19 +1,89 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
-
 trigger:
-- main
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - 'pipeline-folder/*'
 
 pool:
-  vmImage: ubuntu-latest
+  name: 'agent-pool'
+
+
+
+variables:
+  swaggerUrl: 'https://python-web-app-1-bgape3c8aqahgjcn.centralindia-01.azurewebsites.net/openapi.json'
+  fullSwagger: 'swagger-full.json'
+  outputDir: 'split_swagger'
+  resourceGroup: '02-05-rg'
+  apimName: 'python-swagger'
+  subscriptionId: '361d2915-ae3c-4eda-a472-cd1a9f5a25a9'
+  appBaseUrl: 'https://python-web-app-1-bgape3c8aqahgjcn.centralindia-01.azurewebsites.net'
+  
+  # API IDs should be defined as separate variables
+  apiGet: 'get-user'
+  apiPost: 'add-user'
 
 steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
+- task: UsePythonVersion@0
+  displayName: 'Use Python 3.x'
+  inputs:
+    versionSpec: '3.x'
 
 - script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+    curl -sSL $(swaggerUrl) -o $(fullSwagger)
+  displayName: 'Download Full Swagger'
+
+- script: |
+    python split_swagger_by_method.py $(fullSwagger) --output-dir $(outputDir)
+  displayName: 'Split Swagger by Method'
+
+- script: |
+    python sync_apim_operations.py \
+      --subscription-id $(subscriptionId) \
+      --resource-group $(resourceGroup) \
+      --service-name $(apimName) \
+      --spec-file $(outputDir)/users_get.json \
+      --api-id $(apiGet)
+  displayName: 'Sync GET operations in APIM'
+
+- task: AzureCLI@2
+  displayName: 'Import GET API'
+  inputs:
+    azureSubscription: 'Azure Resource-service connectiom'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      az apim api import \
+        --resource-group $(resourceGroup) \
+        --service-name $(apimName) \
+        --path users/get_user \
+        --api-id $(apiGet) \
+        --specification-format OpenApi \
+        --specification-path $(outputDir)/users_get.json \
+        --service-url "$(appBaseUrl)"
+
+- script: |
+    python sync_apim_operations.py \
+      --subscription-id $(subscriptionId) \
+      --resource-group $(resourceGroup) \
+      --service-name $(apimName) \
+      --spec-file $(outputDir)/users_post.json \
+      --api-id $(apiPost)
+  displayName: 'Sync POST operations in APIM'
+
+- task: AzureCLI@2
+  displayName: 'Import POST API'
+  inputs:
+    azureSubscription: 'Azure Resource-service connectiom'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      az apim api import \
+        --resource-group $(resourceGroup) \
+        --service-name $(apimName) \
+        --path users/add_user \
+        --api-id $(apiPost) \
+        --specification-format OpenApi \
+        --specification-path $(outputDir)/users_post.json \
+        --service-url "$(appBaseUrl)"
