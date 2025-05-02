@@ -40,7 +40,7 @@ def sync_apim_operations(subscription_id, resource_group, service_name, spec_fil
         parameters={
             "display_name": operation.get('summary', api_id),
             "service_url": "https://python-web-app-1-bgape3c8aqahgjcn.centralindia-01.azurewebsites.net",  # optionally make this dynamic
-            "path": path.lstrip('/'),
+            "path": api_id,
             "protocols": ["https"],
         },
     )
