@@ -30,6 +30,11 @@ steps:
     python3 scripts/split_swagger_by_method.py $(fullSwagger) --output-dir $(outputDir)
   displayName: 'Split Swagger by Method'
 
+- script: |
+    echo "Generated files:"
+    ls -l $(outputDir)
+  displayName: 'List Split Swagger Files'
+
 
 - script: |
     python3 scripts/sync_apim_operations.py \
