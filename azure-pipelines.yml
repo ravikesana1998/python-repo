@@ -1,15 +1,19 @@
-# Docker
-# Build and push an image to Azure Container Registry
-# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
-
 trigger:
- paths:
-   include:
-     - main/*
-
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - main/*
+      
 resources:
 - repo: self
 
+pool:
+ name: 'agent-pool'
+
+lockBehavior:
+appendCommitMessageToRunName:
 variables:
   # Container registry service connection established during pipeline creation
   dockerRegistryServiceConnection: '5bebc165-1171-4d5e-b27e-43a6fb91d6c1'
@@ -17,9 +21,7 @@ variables:
   containerRegistry: 'conainerreg.azurecr.io'
   dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
   tag: '$(Build.BuildId)'
-
-pool:
- name: 'agent-pool'
+  latestTag: 'latest'
 
 stages:
 - stage: Build
@@ -37,3 +39,4 @@ stages:
         containerRegistry: $(dockerRegistryServiceConnection)
         tags: |
           $(tag)
+          $(latestTag)
