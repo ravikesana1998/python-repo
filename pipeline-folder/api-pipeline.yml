@@ -27,95 +27,212 @@ variables:
 
 steps:
 - task: UsePythonVersion@0
-  displayName: 'Set up Python'
+  displayName: 'Set up Python 3.9'
   inputs:
-    versionSpec: '3.x'
+    versionSpec: '3.9'
+    addToPath: true
 
 - script: |
-    echo "Downloading Swagger from $(swaggerUrl)"
+    python -m pip install --upgrade pip
+    pip install azure-cli azure-mgmt-apimanagement
+  displayName: 'Install Azure CLI and dependencies'
+
+- script: |
+    echo "Downloading and validating Swagger spec from $(swaggerUrl)"
     curl -sSL $(swaggerUrl) -o $(fullSwagger)
-    echo "Downloaded Swagger file:"
-    ls -l $(fullSwagger)
-    echo "File content sample:"
-    head -n 20 $(fullSwagger)
-  displayName: 'Download Swagger'
+    
+    # Validate JSON syntax
+    python -c "import json; json.load(open('$(fullSwagger)'))"
+    
+    echo "Downloaded Swagger file content:"
+    cat $(fullSwagger) | jq . | head -n 30
+  displayName: 'Download and Validate Swagger'
 
 - script: |
-    echo "Splitting Swagger by method..."
-    python3 scripts/split_swagger_by_method.py $(fullSwagger) --output-dir $(outputDir)
-    echo "Split files created:"
-    ls -l $(outputDir)
-  displayName: 'Split Swagger by Method'
+    echo "Splitting Swagger by method with validation..."
+    python scripts/split_swagger_by_method.py $(fullSwagger) --output-dir $(outputDir)
+    
+    echo "Validating split files:"
+    for file in $(outputDir)/swagger-*.json; do
+      echo "Validating $file"
+      python -c "import json; json.load(open('$file'))"
+      echo "Basic content:"
+      cat $file | jq . | head -n 10
+    done
+  displayName: 'Split and Validate Swagger by Method'
 
-# Debug step: Verify output directory contents
 - script: |
-    echo "Verifying contents of output directory $(outputDir):"
-    if [ -d "$(outputDir)" ]; then
-      ls -l $(outputDir)
-    else
-      echo "Output directory not found: $(outputDir)"
-      exit 1
-    fi
-  displayName: 'Verify split_swagger directory'
+    echo "Azure CLI version:"
+    az --version
+    
+    echo "Logging in with service principal..."
+    az login --service-principal -u "$(servicePrincipalId)" -p "$(servicePrincipalKey)" --tenant "$(tenantId)"
+    az account set --subscription $(subscriptionId)
+  displayName: 'Azure Login'
+  env:
+    servicePrincipalId: $(servicePrincipalId)
+    servicePrincipalKey: $(servicePrincipalKey)
+    tenantId: $(tenantId)
 
 # GET Operations
 - script: |
-    if [ ! -f "$(outputDir)/swagger-get.json" ]; then
-      echo "Error: GET Swagger file not found at $(outputDir)/swagger-get.json"
+    echo "Processing GET operations..."
+    spec_file="$(outputDir)/swagger-get.json"
+    
+    # Validate spec file exists
+    if [ ! -f "$spec_file" ]; then
+      echo "##vso[task.logissue type=error]GET Swagger file not found at $spec_file"
       exit 1
     fi
-    python3 scripts/sync_apim_operations.py \
+    
+    # First sync with APIM
+    python scripts/sync_apim_operations.py \
       --subscription-id $(subscriptionId) \
       --resource-group $(resourceGroup) \
       --service-name $(apimName) \
-      --spec-file $(outputDir)/swagger-get.json \
+      --spec-file $spec_file \
       --api-id $(apiGet)
   displayName: 'Sync GET Operations'
 
 - task: AzureCLI@2
   displayName: 'Import GET API'
   inputs:
-    azureSubscription: 'Azure Resource-service connection'
+    azureSubscription: 'Azure Resource-service connectiom'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
+      echo "Importing GET API..."
       az apim api import \
         --resource-group $(resourceGroup) \
         --service-name $(apimName) \
         --path users-get \
         --api-id $(apiGet) \
-        --specification-format OpenApi \
+        --specification-format OpenApiJson \
         --specification-path $(outputDir)/swagger-get.json \
-        --service-url "$(appBaseUrl)"
+        --service-url "$(appBaseUrl)" \
+        --api-type http
+      
+      echo "GET API import completed with status $?"
 
-# Repeat similar structure for POST, PATCH, DELETE
+# POST Operations
 - script: |
-    if [ ! -f "$(outputDir)/swagger-post.json" ]; then
-      echo "Error: POST Swagger file not found at $(outputDir)/swagger-post.json"
+    echo "Processing POST operations..."
+    spec_file="$(outputDir)/swagger-post.json"
+    
+    if [ ! -f "$spec_file" ]; then
+      echo "##vso[task.logissue type=error]POST Swagger file not found at $spec_file"
       exit 1
     fi
-    python3 scripts/sync_apim_operations.py \
+    
+    python scripts/sync_apim_operations.py \
       --subscription-id $(subscriptionId) \
       --resource-group $(resourceGroup) \
       --service-name $(apimName) \
-      --spec-file $(outputDir)/swagger-post.json \
+      --spec-file $spec_file \
       --api-id $(apiPost)
   displayName: 'Sync POST Operations'
 
 - task: AzureCLI@2
   displayName: 'Import POST API'
   inputs:
-    azureSubscription: 'Azure Resource-service connection'
+    azureSubscription: 'Azure Resource-service connectiom'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
+      echo "Importing POST API..."
       az apim api import \
         --resource-group $(resourceGroup) \
         --service-name $(apimName) \
         --path users-post \
         --api-id $(apiPost) \
-        --specification-format OpenApi \
+        --specification-format OpenApiJson \
         --specification-path $(outputDir)/swagger-post.json \
-        --service-url "$(appBaseUrl)"
+        --service-url "$(appBaseUrl)" \
+        --api-type http
+      
+      echo "POST API import completed with status $?"
 
-# Additional PATCH and DELETE operations follow a similar pattern as above.
+# PATCH Operations
+- script: |
+    echo "Processing PATCH operations..."
+    spec_file="$(outputDir)/swagger-patch.json"
+    
+    if [ ! -f "$spec_file" ]; then
+      echo "##vso[task.logissue type=warning]PATCH Swagger file not found at $spec_file"
+      exit 0  # Continue if patch not available
+    fi
+    
+    python scripts/sync_apim_operations.py \
+      --subscription-id $(subscriptionId) \
+      --resource-group $(resourceGroup) \
+      --service-name $(apimName) \
+      --spec-file $spec_file \
+      --api-id $(apiPatch)
+  displayName: 'Sync PATCH Operations'
+
+- task: AzureCLI@2
+  displayName: 'Import PATCH API'
+  inputs:
+    azureSubscription: 'Azure Resource-service connectiom'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      if [ -f "$(outputDir)/swagger-patch.json" ]; then
+        echo "Importing PATCH API..."
+        az apim api import \
+          --resource-group $(resourceGroup) \
+          --service-name $(apimName) \
+          --path users-patch \
+          --api-id $(apiPatch) \
+          --specification-format OpenApiJson \
+          --specification-path $(outputDir)/swagger-patch.json \
+          --service-url "$(appBaseUrl)" \
+          --api-type http
+      else
+        echo "No PATCH spec found, skipping"
+      fi
+
+# DELETE Operations
+- script: |
+    echo "Processing DELETE operations..."
+    spec_file="$(outputDir)/swagger-delete.json"
+    
+    if [ ! -f "$spec_file" ]; then
+      echo "##vso[task.logissue type=warning]DELETE Swagger file not found at $spec_file"
+      exit 0  # Continue if delete not available
+    fi
+    
+    python scripts/sync_apim_operations.py \
+      --subscription-id $(subscriptionId) \
+      --resource-group $(resourceGroup) \
+      --service-name $(apimName) \
+      --spec-file $spec_file \
+      --api-id $(apiDelete)
+  displayName: 'Sync DELETE Operations'
+
+- task: AzureCLI@2
+  displayName: 'Import DELETE API'
+  inputs:
+    azureSubscription: 'Azure Resource-service connectiom'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      if [ -f "$(outputDir)/swagger-delete.json" ]; then
+        echo "Importing DELETE API..."
+        az apim api import \
+          --resource-group $(resourceGroup) \
+          --service-name $(apimName) \
+          --path users-delete \
+          --api-id $(apiDelete) \
+          --specification-format OpenApiJson \
+          --specification-path $(outputDir)/swagger-delete.json \
+          --service-url "$(appBaseUrl)" \
+          --api-type http
+      else
+        echo "No DELETE spec found, skipping"
+      fi
+
+- script: |
+    echo "Final API list in APIM:"
+    az apim api list --resource-group $(resourceGroup) --service-name $(apimName) --output table
+  displayName: 'Verify API Import'
