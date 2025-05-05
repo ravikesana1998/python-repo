@@ -15,18 +15,32 @@ def validate_spec(spec_path):
     if "info" not in spec:
         spec["info"] = {"title": "API", "version": "1.0.0"}
     
-    # Clean paths
+    # Clean paths and responses
     if "paths" in spec:
-        for path_item in spec["paths"].values():
-            for operation in path_item.values():
+        for path, path_item in spec["paths"].items():
+            for method, operation in path_item.items():
                 if "responses" in operation:
-                    for response in operation["responses"].values():
+                    for status_code, response in operation["responses"].items():
+                        # Ensure all responses have content
                         if "content" not in response:
                             response["content"] = {
                                 "application/json": {
                                     "schema": {"type": "object"}
                                 }
                             }
+                        # Ensure schema is properly formatted
+                        elif "application/json" in response["content"]:
+                            content = response["content"]["application/json"]
+                            if "schema" not in content:
+                                content["schema"] = {"type": "object"}
+                            elif "$ref" in content["schema"]:
+                                # Replace complex references with simple objects
+                                content["schema"] = {"type": "object"}
+    
+    # Remove components to simplify
+    if "components" in spec:
+        spec.pop("components")
+    
     return spec
 
 def sync_apim_operations(subscription_id, resource_group, service_name, spec_file, api_id):
@@ -36,12 +50,14 @@ def sync_apim_operations(subscription_id, resource_group, service_name, spec_fil
     
     # Validate and clean spec
     validated_spec = validate_spec(spec_file)
+    
+    # Write validated spec to temp file for debugging
     temp_spec = f"{spec_file}.validated.json"
+    with open(temp_spec, 'w') as f:
+        json.dump(validated_spec, f, indent=2)
+        print(f"Validated spec written to {temp_spec}")
     
     try:
-        with open(temp_spec, 'w') as f:
-            json.dump(validated_spec, f, indent=2)
-        
         credential = DefaultAzureCredential()
         client = ApiManagementClient(credential, subscription_id)
 
@@ -62,6 +78,8 @@ def sync_apim_operations(subscription_id, resource_group, service_name, spec_fil
         print(f"Successfully synced API: {result.display_name}")
     except Exception as e:
         print(f"Error syncing API: {str(e)}")
+        print("Validated spec content:")
+        print(json.dumps(validated_spec, indent=2))
         raise
     finally:
         if os.path.exists(temp_spec):
