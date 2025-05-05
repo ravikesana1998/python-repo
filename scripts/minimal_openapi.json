@@ -1,0 +1,32 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Minimal Test API",
+    "version": "1.0.0",
+    "description": "Minimal valid OpenAPI spec for testing"
+  },
+  "paths": {
+    "/test": {
+      "get": {
+        "operationId": "test_get",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
