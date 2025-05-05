@@ -24,7 +24,7 @@ app.include_router(users.router, prefix="/users", tags=["Users"])
 def read_root():
     return {"Hello": "World"}
 
-# Custom OpenAPI schema generation
+# Custom OpenAPI schema generation without HTTPValidationError
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
@@ -34,24 +34,10 @@ def custom_openapi():
         description="Custom API",
         routes=app.routes,
     )
-    # Ensure the required schemas are present
-    openapi_schema["components"]["schemas"]["HTTPValidationError"] = {
-        "type": "object",
-        "properties": {
-            "detail": {
-                "type": "array",
-                "items": {"$ref": "#/components/schemas/ValidationError"},
-            }
-        },
-    }
-    openapi_schema["components"]["schemas"]["ValidationError"] = {
-        "type": "object",
-        "properties": {
-            "loc": {"type": "array", "items": {"type": "string"}},
-            "msg": {"type": "string"},
-            "type": {"type": "string"},
-        },
-    }
+    # Remove validation error schemas if they exist
+    openapi_schema["components"]["schemas"].pop("HTTPValidationError", None)
+    openapi_schema["components"]["schemas"].pop("ValidationError", None)
+    
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
