@@ -96,27 +96,41 @@ steps:
       exit 1
     fi
     
-    # Additional validation step
-    echo "Validating GET spec..."
+    # Additional strict validation
+    echo "Performing strict validation..."
     python3 -c "
 import json, sys
 try:
     spec = json.load(open('$spec_file'))
-    print('Spec is valid JSON')
+    print('Basic JSON validation passed')
     
-    # Check for required fields
-    if not all(k in spec for k in ['openapi', 'info', 'paths']):
-        print('Missing required OpenAPI fields')
+    # Check for required OpenAPI fields
+    required_fields = ['openapi', 'info', 'paths']
+    missing_fields = [f for f in required_fields if f not in spec]
+    if missing_fields:
+        print(f'Missing required fields: {missing_fields}')
         sys.exit(1)
-        
-    # Check responses
-    for path in spec.get('paths', {}).values():
-        for operation in path.values():
-            for response in operation.get('responses', {}).values():
+    
+    # Check all operations have proper responses
+    for path, path_item in spec.get('paths', {}).items():
+        for method, operation in path_item.items():
+            if method.lower() not in ['get', 'post', 'put', 'patch', 'delete']:
+                continue
+                
+            if 'responses' not in operation:
+                print(f'Missing responses for {method.upper()} {path}')
+                sys.exit(1)
+                
+            for code, response in operation['responses'].items():
                 if 'content' not in response:
-                    print('Response missing content')
+                    print(f'Missing content for {code} response in {method.upper()} {path}')
                     sys.exit(1)
-    print('All responses have content')
+                    
+                if 'application/json' not in response['content']:
+                    print(f'Missing application/json in content for {method.upper()} {path}')
+                    sys.exit(1)
+    
+    print('All operations have valid responses')
 except Exception as e:
     print(f'Validation failed: {str(e)}')
     sys.exit(1)
@@ -130,7 +144,6 @@ except Exception as e:
       --spec-file $spec_file \
       --api-id $(apiGet)
   displayName: 'Sync GET Operations'
-
   
 - task: AzureCLI@2
   displayName: 'Import GET API'
