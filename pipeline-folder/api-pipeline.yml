@@ -87,18 +87,40 @@ steps:
     tenantId: $(tenantId)
 # GET Operations
 - script: |
-    echo "Validating sync script..."
-    python3 -c "from scripts.sync_apim_operations import validate_spec; print('Sync script imports successfully')"
-    
     echo "Processing GET operations..."
     spec_file="$(outputDir)/swagger-get.json"
     
-    # Validate spec file exists and is valid
+    # Validate spec file exists
     if [ ! -f "$spec_file" ]; then
       echo "##vso[task.logissue type=error]GET Swagger file not found at $spec_file"
       exit 1
     fi
-    python3 -c "import json; json.load(open('$spec_file'))" || exit 1
+    
+    # Additional validation step
+    echo "Validating GET spec..."
+    python3 -c "
+import json, sys
+try:
+    spec = json.load(open('$spec_file'))
+    print('Spec is valid JSON')
+    
+    # Check for required fields
+    if not all(k in spec for k in ['openapi', 'info', 'paths']):
+        print('Missing required OpenAPI fields')
+        sys.exit(1)
+        
+    # Check responses
+    for path in spec.get('paths', {}).values():
+        for operation in path.values():
+            for response in operation.get('responses', {}).values():
+                if 'content' not in response:
+                    print('Response missing content')
+                    sys.exit(1)
+    print('All responses have content')
+except Exception as e:
+    print(f'Validation failed: {str(e)}')
+    sys.exit(1)
+"
     
     # First sync with APIM
     python3 scripts/sync_apim_operations.py \
