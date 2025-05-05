@@ -62,6 +62,18 @@ steps:
   displayName: 'Split and Validate Swagger by Method'
 
 - script: |
+    echo "Splitting Swagger by method..."
+    python3 -c "import json; json.load(open('$(fullSwagger)'))" && echo "Input file is valid JSON"
+    python3 scripts/split_swagger_by_method.py $(fullSwagger) --output-dir $(outputDir)
+    echo "Split files created:"
+    ls -l $(outputDir)
+    echo "Validating output files:"
+    for file in $(outputDir)/*.json; do
+      python3 -c "import json; json.load(open('$file'))" && echo "$file is valid JSON"
+    done
+  displayName: 'Split Swagger by Method'
+
+- script: |
     echo "Azure CLI version:"
     az --version
     
