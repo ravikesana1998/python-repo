@@ -10,13 +10,11 @@ resources:
 - repo: self
 
 pool:
- name: 'agent-pool'
+  name: 'agent-pool'
 
-lockBehavior:
-appendCommitMessageToRunName:
 variables:
   # Container registry service connection established during pipeline creation
-  dockerRegistryServiceConnection: '5bebc165-1171-4d5e-b27e-43a6fb91d6c1'
+  dockerRegistryServiceConnection: '41baad4b-a835-42a1-862a-b6a29cde7589'
   imageRepository: 'pythonrepo'
   containerRegistry: 'conainerreg.azurecr.io'
   dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
