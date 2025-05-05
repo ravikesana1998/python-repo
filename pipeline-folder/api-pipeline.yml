@@ -85,20 +85,23 @@ steps:
     servicePrincipalId: $(servicePrincipalId)
     servicePrincipalKey: $(servicePrincipalKey)
     tenantId: $(tenantId)
-
 # GET Operations
 - script: |
+    echo "Validating sync script..."
+    python3 -c "from scripts.sync_apim_operations import validate_spec; print('Sync script imports successfully')"
+    
     echo "Processing GET operations..."
     spec_file="$(outputDir)/swagger-get.json"
     
-    # Validate spec file exists
+    # Validate spec file exists and is valid
     if [ ! -f "$spec_file" ]; then
       echo "##vso[task.logissue type=error]GET Swagger file not found at $spec_file"
       exit 1
     fi
+    python3 -c "import json; json.load(open('$spec_file'))" || exit 1
     
     # First sync with APIM
-    python scripts/sync_apim_operations.py \
+    python3 scripts/sync_apim_operations.py \
       --subscription-id $(subscriptionId) \
       --resource-group $(resourceGroup) \
       --service-name $(apimName) \
@@ -106,6 +109,7 @@ steps:
       --api-id $(apiGet)
   displayName: 'Sync GET Operations'
 
+  
 - task: AzureCLI@2
   displayName: 'Import GET API'
   inputs:
