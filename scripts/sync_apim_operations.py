@@ -5,7 +5,7 @@ from azure.mgmt.apimanagement import ApiManagementClient
 from azure.identity import DefaultAzureCredential
 
 def validate_spec(spec_path):
-    """Validate OpenAPI spec before import"""
+    """Validate and clean OpenAPI spec before import"""
     with open(spec_path, 'r') as f:
         spec = json.load(f)
     
@@ -16,14 +16,17 @@ def validate_spec(spec_path):
         spec["info"] = {"title": "API", "version": "1.0.0"}
     
     # Clean paths
-    for path in spec.get("paths", {}).values():
-        for operation in path.values():
-            # Ensure all responses have content
-            for response in operation.get("responses", {}).values():
-                if "content" not in response:
-                    response["content"] = {
-                        "application/json": {"schema": {"type": "object"}}
-    
+    if "paths" in spec:
+        for path_item in spec["paths"].values():
+            for operation in path_item.values():
+                if "responses" in operation:
+                    for response in operation["responses"].values():
+                        if "content" not in response:
+                            response["content"] = {
+                                "application/json": {
+                                    "schema": {"type": "object"}
+                                }
+                            }
     return spec
 
 def sync_apim_operations(subscription_id, resource_group, service_name, spec_file, api_id):
@@ -34,13 +37,14 @@ def sync_apim_operations(subscription_id, resource_group, service_name, spec_fil
     # Validate and clean spec
     validated_spec = validate_spec(spec_file)
     temp_spec = f"{spec_file}.validated.json"
-    with open(temp_spec, 'w') as f:
-        json.dump(validated_spec, f)
     
-    credential = DefaultAzureCredential()
-    client = ApiManagementClient(credential, subscription_id)
-
     try:
+        with open(temp_spec, 'w') as f:
+            json.dump(validated_spec, f, indent=2)
+        
+        credential = DefaultAzureCredential()
+        client = ApiManagementClient(credential, subscription_id)
+
         poller = client.api.begin_create_or_update(
             resource_group_name=resource_group,
             service_name=service_name,
