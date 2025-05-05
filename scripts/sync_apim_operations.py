@@ -19,25 +19,53 @@ def validate_spec(spec_path):
     if "paths" in spec:
         for path, path_item in spec["paths"].items():
             for method, operation in path_item.items():
-                if "responses" in operation:
+                if method.lower() not in ['get', 'post', 'put', 'patch', 'delete']:
+                    continue
+                    
+                # Ensure operation has operationId
+                if "operationId" not in operation:
+                    operation["operationId"] = f"{method}_{path.replace('/', '_').replace('{', '').replace('}', '').lower()}"
+                
+                # Ensure responses exist and are properly formatted
+                if "responses" not in operation:
+                    operation["responses"] = {
+                        "200": {
+                            "description": "Success",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object"}
+                                }
+                            }
+                        }
+                    }
+                else:
                     for status_code, response in operation["responses"].items():
-                        # Ensure all responses have content
+                        # Ensure response has description
+                        if "description" not in response:
+                            response["description"] = "Success" if status_code == "200" else "Error"
+                        
+                        # Ensure content exists
                         if "content" not in response:
                             response["content"] = {
                                 "application/json": {
                                     "schema": {"type": "object"}
                                 }
                             }
-                        # Ensure schema is properly formatted
-                        elif "application/json" in response["content"]:
-                            content = response["content"]["application/json"]
-                            if "schema" not in content:
-                                content["schema"] = {"type": "object"}
-                            elif "$ref" in content["schema"]:
-                                # Replace complex references with simple objects
-                                content["schema"] = {"type": "object"}
+                        else:
+                            # Ensure application/json exists
+                            if "application/json" not in response["content"]:
+                                response["content"]["application/json"] = {
+                                    "schema": {"type": "object"}
+                                }
+                            else:
+                                # Ensure schema exists and is simple
+                                content = response["content"]["application/json"]
+                                if "schema" not in content:
+                                    content["schema"] = {"type": "object"}
+                                elif isinstance(content["schema"], dict) and "$ref" in content["schema"]:
+                                    content["schema"] = {"type": "object"}
     
-    # Remove components to simplify
+    # Remove components to avoid validation issues
     if "components" in spec:
         spec.pop("components")
     
