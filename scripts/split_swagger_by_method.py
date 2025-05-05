@@ -40,7 +40,7 @@ def split_swagger(input_file, output_dir):
     for method in methods:
         if output_files[method]['paths']:
             output_spec = {
-                'openapi': swagger.get('openapi', '3.0.0'),
+                'openapi': '3.0.1',  # 🔧 Force downgrade here
                 'info': swagger.get('info', {}),
                 'paths': output_files[method]['paths'],
                 'components': swagger.get('components', {})  # optionally include base schemas
