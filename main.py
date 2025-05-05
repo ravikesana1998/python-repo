@@ -26,40 +26,39 @@ def read_root():
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
-
     openapi_schema = get_openapi(
         title="Your API",
         version="1.0.0",
         description="Custom API",
         routes=app.routes,
     )
+    # Remove Validation Errors
+    if "components" in openapi_schema and "schemas" in openapi_schema["components"]:
+        openapi_schema["components"]["schemas"].pop("HTTPValidationError", None)
+        openapi_schema["components"]["schemas"].pop("ValidationError", None)
 
-    # Remove schemas
-    openapi_schema.get("components", {}).get("schemas", {}).pop("HTTPValidationError", None)
-    openapi_schema.get("components", {}).get("schemas", {}).pop("ValidationError", None)
-
-    # Recursively clean $ref and remove 422 responses
-    def clean_paths(paths):
-        for path in paths.values():
-            for method in path.values():
-                responses = method.get("responses", {})
-                # Remove 422 response
-                if "422" in responses:
-                    del responses["422"]
-                # Clean out $ref to HTTPValidationError if present
-                for code, resp in list(responses.items()):
-                    content = resp.get("content", {})
-                    if (
-                        "application/json" in content
-                        and "$ref" in content["application/json"].get("schema", {})
-                        and content["application/json"]["schema"]["$ref"].endswith("HTTPValidationError")
-                    ):
-                        del responses[code]
-
-    clean_paths(openapi_schema.get("paths", {}))
+    # Remove invalid references to those errors in responses
+    for path, methods in openapi_schema.get("paths", {}).items():
+        for method, details in methods.items():
+            if "responses" in details:
+                for code, response in list(details["responses"].items()):
+                    if "content" in response:
+                        content = response["content"]
+                        if "application/json" in content:
+                            schema = content["application/json"].get("schema", {})
+                            if (
+                                isinstance(schema, dict) and 
+                                "$ref" in schema and 
+                                schema["$ref"].endswith("HTTPValidationError")
+                            ):
+                                del details["responses"][code]
+                            elif schema == {}:
+                                # Replace empty schema with a simple valid schema
+                                content["application/json"]["schema"] = {"type": "object"}
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema
+
 
 
 # Set the custom OpenAPI function
