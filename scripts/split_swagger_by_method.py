@@ -5,20 +5,25 @@ import argparse
 def sanitize_spec(spec):
     """Ensure spec is valid OpenAPI 3.0.1"""
     # Remove problematic components
-    spec.pop("components", None)
+    if 'components' in spec:
+        spec.pop("components")
     
     # Clean paths
-    for path in spec.get("paths", {}).values():
-        for operation in path.values():
-            # Ensure all responses have content
-            for response in operation.get("responses", {}).values():
-                if "content" not in response:
-                    response["content"] = {
-                        "application/json": {"schema": {"type": "object"}}
-    
+    if 'paths' in spec:
+        for path_item in spec['paths'].values():
+            for operation in path_item.values():
+                if 'responses' in operation:
+                    for response in operation['responses'].values():
+                        if 'content' not in response:
+                            response['content'] = {
+                                "application/json": {
+                                    "schema": {"type": "object"}
+                                }
+                            }
     return spec
 
 def split_swagger(input_file, output_dir):
+    """Split Swagger file by HTTP methods"""
     with open(input_file, 'r') as f:
         swagger = json.load(f)
 
@@ -34,7 +39,10 @@ def split_swagger(input_file, output_dir):
         if paths:
             output_spec = {
                 "openapi": "3.0.1",
-                "info": swagger.get("info", {"title": f"{method.upper()} Operations", "version": "1.0.0"}),
+                "info": swagger.get("info", {
+                    "title": f"{method.upper()} Operations",
+                    "version": "1.0.0"
+                }),
                 "paths": paths
             }
             
@@ -46,8 +54,17 @@ def split_swagger(input_file, output_dir):
             print(f"Created {method} spec at {output_path}")
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("swagger_file", help="Path to Swagger JSON file")
-    parser.add_argument("--output-dir", default="split_swagger", help="Output directory")
+    parser = argparse.ArgumentParser(
+        description='Split Swagger/OpenAPI file by HTTP methods'
+    )
+    parser.add_argument(
+        "swagger_file",
+        help="Path to Swagger JSON file"
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="split_swagger",
+        help="Output directory for split files"
+    )
     args = parser.parse_args()
     split_swagger(args.swagger_file, args.output_dir)
